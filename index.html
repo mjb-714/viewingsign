@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Digital Sign</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: black;
+            color: white;
+            font-family: Arial, sans-serif;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+        #container {
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+        }
+        /* Left Side Styles */
+        #left-side {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Center content horizontally */
+            justify-content: center; /* Center content vertically */
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        /* Right Side Styles */
+        #right-side {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        /* Adjustments when there are no tributes */
+        .no-tributes #container {
+            flex-direction: row;
+        }
+        /* Removed the alignment override to keep content centered */
+        /* .no-tributes #left-side {
+            align-items: flex-start;
+        } */
+        /* Image Styles */
+        #image-container {
+            width: 500px;
+            height: 700px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        #image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        /* Text Styles */
+        #name {
+            font-size: 4em;
+            font-weight: bold;
+            margin: 0;
+            text-align: center; /* Ensure text is centered */
+        }
+        #dates {
+            font-size: 2em;
+            margin: 0.5em 0 0 0;
+            text-align: center; /* Ensure text is centered */
+        }
+        /* Tribute Text Styles */
+        #tribute-text {
+            font-size: 2em;
+            text-align: center;
+            max-width: 90%;
+            opacity: 0; /* Start with opacity 0 */
+        }
+        /* Fade-in Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        /* Fade-out Animation */
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to   { opacity: 0; }
+        }
+        .fade-in {
+            animation: fadeIn 3s forwards;
+        }
+        .fade-out {
+            animation: fadeOut 3s forwards;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- Left Side -->
+        <div id="left-side">
+            <div id="image-container">
+                <img id="image" src="" alt="Image">
+            </div>
+            <h1 id="name">Loading...</h1>
+            <p id="dates"></p>
+        </div>
+        <!-- Right Side -->
+        <div id="right-side">
+            <p id="tribute-text">Loading tributes...</p>
+        </div>
+    </div>
+
+    <script>
+        // Variables to hold data
+        let tributes = [];
+        let currentTributeIndex = 0;
+        let initialName = ''; // To store the initial 'name' variable
+
+        function updateVariables() {
+            // Fetch variables.json
+            fetch('variables.json?t=' + new Date().getTime())
+                .then(response => response.json())
+                .then(data => {
+                    // Check if initialName is empty (first load)
+                    if (initialName === '') {
+                        // First time loading the page
+                        initialName = data.name;
+                        document.getElementById('name').textContent = data.name;
+                        document.getElementById('dates').textContent = data.dates;
+                        document.getElementById('image').src = data.image;
+                    } else if (data.name !== initialName) {
+                        // Name has changed, reload the page
+                        location.reload();
+                    } else {
+                        // Name hasn't changed, update other variables if needed
+                        document.getElementById('dates').textContent = data.dates;
+                        document.getElementById('image').src = data.image;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching variables:', error);
+                    document.getElementById('name').textContent = 'Error Loading Data';
+                });
+
+            // Fetch tributes.json
+            fetch('tributes.json?t=' + new Date().getTime())
+                .then(response => response.json())
+                .then(data => {
+                    tributes = data.tributes;
+                    if (tributes.length > 0) {
+                        // There are tributes
+                        // Ensure image is in left-side
+                        if (document.getElementById('image-container').parentNode.id !== 'left-side') {
+                            document.getElementById('left-side').insertBefore(document.getElementById('image-container'), document.getElementById('name'));
+                        }
+                        document.body.classList.add('with-tributes');
+                        document.body.classList.remove('no-tributes');
+                        document.getElementById('tribute-text').style.display = 'block';
+                        displayTribute();
+                    } else {
+                        // No tributes
+                        // Ensure image is in right-side
+                        if (document.getElementById('image-container').parentNode.id !== 'right-side') {
+                            document.getElementById('right-side').insertBefore(document.getElementById('image-container'), document.getElementById('tribute-text'));
+                        }
+                        document.getElementById('tribute-text').style.display = 'none';
+                        document.body.classList.add('no-tributes');
+                        document.body.classList.remove('with-tributes');
+                    }
+                    // Start periodic check for name change
+                    setInterval(checkForNameChange, 60000); // Check every 60 seconds
+                })
+                .catch(error => {
+                    console.error('Error fetching tributes:', error);
+                    document.getElementById('tribute-text').textContent = 'Error Loading Tributes';
+                });
+        }
+
+        function displayTribute() {
+            const tributeText = document.getElementById('tribute-text');
+
+            function showNextTribute() {
+                // Fade out current tribute
+                tributeText.classList.remove('fade-in');
+                tributeText.classList.add('fade-out');
+
+                // Wait for fade-out to complete before changing text
+                setTimeout(() => {
+                    // Update index to next tribute
+                    currentTributeIndex = (currentTributeIndex + 1) % tributes.length;
+
+                    // Change the text
+                    tributeText.textContent = tributes[currentTributeIndex];
+
+                    // Remove fade-out class
+                    tributeText.classList.remove('fade-out');
+
+                    // Trigger reflow to restart the animation
+                    void tributeText.offsetWidth;
+
+                    // Fade in new tribute
+                    tributeText.classList.add('fade-in');
+                }, 3000); // Duration matches CSS animation duration (3 seconds)
+            }
+
+            // Show the first tribute with fade-in
+            tributeText.textContent = tributes[currentTributeIndex];
+            tributeText.classList.add('fade-in');
+
+            // Schedule the next tribute
+            setInterval(showNextTribute, 12000); // Change tribute every 12 seconds
+        }
+
+        function checkForNameChange() {
+            // Fetch variables.json to check if 'name' has changed
+            fetch('variables.json?t=' + new Date().getTime())
+                .then(response => response.json())
+                .then(data => {
+                    if (data.name !== initialName) {
+                        // Name has changed, reload the page
+                        location.reload();
+                    } else {
+                        // Optionally update other variables like 'dates' or 'image'
+                        document.getElementById('dates').textContent = data.dates;
+                        document.getElementById('image').src = data.image;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking for name change:', error);
+                });
+        }
+
+        // Initial load
+        updateVariables();
+    </script>
+</body>
+</html>
